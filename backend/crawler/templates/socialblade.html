@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{% static 'css/socialblade.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <title>Crawler Test Page</title>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <h1>Crawler Test Page</h1>
+        <div class="header">
+            <select id="crawl-select">
+                <option value="youtube">Youtube</option>
+<!--                <option value="twitter">Twitter</option>-->
+<!--                <option value="twitter2">Twitter2</option>-->
+                <option value="tiktok">Tiktok</option>
+                <option value="weverse">Weverse</option>
+                <option value="crowdtangle">Crowdtangle(Facebook, Instagram)</option>
+                <option value="vlive">Vlive</option>
+                <option value="melon">Melon</option>
+                <option value="spotify">Spotify</option>
+                <option value="crowdtangle-past">Crowdtangle-past</option>
+            </select>
+            <button id="start-crawl" class="btn btn-primary">크롤링 즉시 실행</button>
+            <select id="data-select">
+                <option value="youtube">Youtube</option>
+                <option value="twitter">Twitter</option>
+                <option value="twitter2">Twitter2</option>
+                <option value="tiktok">Tiktok</option>
+                <option value="weverse">Weverse</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="vlive">Vlive</option>
+                <option value="melon">Melon</option>
+                <option value="spotify">Spotify</option>
+            </select>
+            <button id="show-data" class="btn btn-info">크롤링 데이터 보기</button>
+            <button type="button" class="btn btn-success" data-toggle="modal" data-target="#scheduleCreateModal">
+                스케줄 생성
+            </button>
+            <button id="listup-schedule" type="button" class="btn btn-dark" data-toggle="modal" data-target="#scheduleListModal">
+                스케줄 목록
+            </button>
+            <button id="listup-tasks" type="button" class="btn btn-warning" data-toggle="modal" data-target="#taskListModal">
+                실행 Task 목록
+            </button>
+            <button id="monitoring" type="button" class="btn btn-light" data-toggle="modal" data-target="#monitorModal">
+                모니터링
+            </button>
+        </div>
+        <div id="progress">
+            <div class="spinner-border text-primary crawler-loading" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <div class="crawler-finish">
+                Finish
+            </div>
+        </div>
+        <table class="table">
+            <thead id="table-header" class="thead-dark">
+                <tr>
+                    <th scope="col">artist</th>
+                    <th scope="col">uploads</th>
+                    <th scope="col">subscribers</th>
+                    <th scope="col">views</th>
+                    <th scope="col">User Created</th>
+                    <th scope="col">Recorded Date</th>
+                    <th scope="col">URL</th>
+                </tr>
+            </thead>
+            <tbody id="board"></tbody>
+        </table>
+    </div>
+    <div class="modal fade" id="scheduleCreateModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="exampleModalLabel">Schedule 생성하기</h5>
+            <button id="close-schedulemodal" type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form class="">
+              <div class="form-group">
+                <label for="spiderSelect">Spider</label>
+                 <select class="form-control" id="spiderSelect">
+                        <option value="youtube">Youtube</option>
+                        <option value="twitter">Twitter</option>
+                        <option value="twitter2">Twitter2</option>
+                        <option value="tiktok">Tiktok</option>
+                        <option value="weverse">Weverse</option>
+                        <option value="crowdtangle">Crowdtangle(Facebook, Instagram)</option>
+                        <option value="vlive">Vlive</option>
+                        <option value="melon">Melon</option>
+                        <option value="spotify">Spotify</option>
+                </select>
+              </div>
+                <div class="form-group">
+                  <label for="hoursControlInput">몇 시에 진행?</label>
+                  <input type="number" class="form-control" id="hoursControlInput" placeholder="0 ~ 23; 빈 칸이면 시간별로 진행">
+              </div>
+              <div class="form-group">
+                  <label for="minutesControlInput">시간별로 몇 분에 진행?</label>
+                  <input type="number" class="form-control" id="minutesControlInput" placeholder="0 ~ 59; Default: 0">
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">닫기</button>
+            <button id="create-schedule" type="button" class="btn btn-primary">스케줄 생성</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="scheduleListModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">스케줄 목록</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+             <table class="table">
+                 <thead>
+                    <tr>
+                        <th scope="col">Schedule Name</th>
+                        <th scope="col">Hour</th>
+                        <th scope="col">Minute</th>
+                        <th scope="col">Last Run</th>
+                        <th scope="col">Enabled</th>
+                        <th scope="col">삭제</th>
+                    </tr>
+                 </thead>
+             <tbody id="schedule-board"></tbody>
+             </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="taskListModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">실행된 Task 목록</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+             <table class="table">
+                 <thead>
+                    <tr>
+                        <th scope="col">Task id</th>
+                        <th scope="col">Task 이름</th>
+                        <th scope="col">상태</th>
+                        <th scope="col">시작된 시간</th>
+                        <th scope="col">Platform</th>
+                        <th scope="col">실행 시간</th>
+                    </tr>
+                 </thead>
+             <tbody id="task-board"></tbody>
+             </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal fade" id="monitorModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">모니터링</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+              <form style="display: grid; grid-template-columns: 1fr 1fr 80px; gap: 10px; align-items: center">
+                  <div class="form-group">
+                    <label for="InputFromDate">From Date</label>
+                    <input type="text" class="form-control" id="InputFromDate"  placeholder="(YYYY-MM-DD) 2022-02-04 부터만 가능">
+                  </div>
+                  <div class="form-group">
+                    <label for="InputToDate">To Date</label>
+                    <input type="text" class="form-control" id="InputToDate" placeholder="(YYYY-MM-DD)">
+                  </div>
+                  <button id="get-monitor" style="height:40px" class="btn btn-primary">조회</button>
+              </form>
+              <table class="table">
+                 <thead>
+                    <tr>
+                        <th scope="col">정상</th>
+                        <th scope="col">오류</th>
+                        <th scope="col">실행중인 Task</th>
+                    </tr>
+                 </thead>
+                 <tbody id="stats-board"></tbody>
+             </table>
+             <table class="table">
+                 <thead>
+                    <tr>
+                        <th scope="col">Type</th>
+                        <th scope="col">Artist</th>
+                        <th scope="col">Platform</th>
+                        <th scope="col">Url</th>
+                    </tr>
+                 </thead>
+                 <tbody id="monitor-board"></tbody>
+             </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="{% static 'js/socialblade.js' %}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+version: "3.8"
+
+services:
+  yg-mariadb:
+    image: mariadb:10.7.1
+    container_name: yg-mariadb
+    restart: always
+    volumes:
+      - ./db/conf.d:/etc/mysql/conf.d
+      - ./db/data:/var/lib/mysql
+      - ./db/initdb.d:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_HOST=yg-mariadb
+      - MYSQL_PORT=3306
+      - MYSQL_ROOT_PASSWORD=ygenter
+      - MYSQL_DATABASE=ygenter
+      - MYSQL_USER=ygenter
+      - MYSQL_PASSWORD=ygenter
+
+  yg-rabbitmq:
+    image: rabbitmq:3.7.14-management-alpine
+    container_name: yg-rabbitmq
+    environment:
+      - RABBITMQ_USER=ygenter
+      - RABBITMQ_PASSWORD=ygenter
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  yg-data-analysis:
+    image: data-analysis
+    # image: python:3.9-alpine3.13 #python alpine
+    container_name: yg-data-analysis
+    restart: always
+    depends_on:
+      - yg-mariadb
+      - yg-celery-flower
+    volumes:
+      - ./data/log:/data/log
+    environment:
+      - MYSQL_DB=ygenter
+      - MYSQL_USER=ygenter
+      - MYSQL_PASSWORD=ygenter
+    links:
+      - yg-celery-flower:flower
+    command: >
+      sh -c "python3 manage.py wait_for_db &&
+             python3 manage.py makemigrations &&
+             python3 manage.py migrate &&
+             python3 manage.py runserver 0.0.0.0:8000 --insecure"
+    ports:
+      - "0.0.0.0:8081:8000"
+
+#  command: celery -A crawler worker --beat -c 6 -l info
+  yg-celery-worker:
+    image: data-analysis
+    container_name: yg-celery-worker
+    command: celery -A crawler worker -c 6 -l info
+    volumes:
+      - ./data/log:/app/data/log
+    ports: [ ]
+    links:
+      - yg-rabbitmq
+    depends_on:
+      - yg-rabbitmq
+      - yg-mariadb
+
+  yg-celery-beat:
+    image: data-analysis
+    container_name: yg-celery-beat
+    command: celery -A crawler beat -l info
+    ports: [ ]
+    links:
+      - yg-rabbitmq
+    depends_on:
+      - yg-rabbitmq
+      - yg-celery-worker
+      - yg-mariadb
+      - yg-data-analysis
+
+  yg-celery-flower:
+    image: data-analysis
+    container_name: yg-celery-flower
+    command: celery -A crawler flower --port=5555
+    depends_on:
+      - yg-rabbitmq
+      - yg-celery-worker
+      - yg-mariadb
+    ports:
+      - "5555:5555"
+    links:
+      - yg-rabbitmq

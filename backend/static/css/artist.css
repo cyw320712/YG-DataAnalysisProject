@@ -1,0 +1,298 @@
+#first-table{
+    text-align: center;
+    width: 40%;
+    height: 650px;
+    overflow-y: scroll;
+    border: 1px solid lightgray;
+    border-radius: 10px;
+    padding: 20px;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255,0.2), 0 1px 2px rgba(17, 24, 39,0.2);
+}
+
+#second-table{
+    justify-content: center;
+    text-align: center;
+    width:30%;
+    /* min-width: 300px; */
+    height: 650px;
+    overflow-y: scroll;
+    border: 1px solid lightgray;
+    border-radius: 10px;
+    padding: 20px;
+    margin-left: 10px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255), 0 1px 2px rgba(17, 24, 39);
+}
+
+
+
+.button_layout a{
+    text-decoration: none;
+    margin: 5px;
+    border: 1px solid black;
+    background-color: lightgray;
+    padding: 0 20px;
+    color: black;
+}
+
+.button_layout button{
+    text-decoration: none;
+    margin: 5px;
+    border: 1px solid black;
+    background-color: lightgray;
+    padding: 0 20px;
+    color: black;
+}
+
+
+#artist-header{
+    color: black;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* #artist-header td{
+    color: black;
+    text-align: center;
+    font-weight: bold;
+} */
+
+
+
+.add-form{
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    margin-top: 20px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    
+}
+
+#artist-body td{
+    min-width: 10px;
+}
+
+.artist-add-table{
+    width: 30%;
+    height: 100%;
+    margin-top: 30px;
+}
+
+.add-table{
+    width: 70%;
+    height: 100%;
+    margin-left: 10px;
+}
+
+.title-th{
+    font-weight: bold;
+    color: white;
+    font-size : 12px !important;
+}
+
+.artist-add-table th, .artist-add-table td{
+    padding: 10px;
+}
+
+.add-table th, .add-table td{
+    padding: 3px;
+}
+
+.add-target-input-1{
+    width: 100% !important;
+    /* float: left; */
+}
+
+.add-target-input-2{
+    width: 100% !important;
+    /* float: left; */
+}
+
+.url-description{
+    color : darkblue;
+    font-weight: lighter;
+    font-size: 12px;
+}
+
+/* .add-submit{
+    width: 100px;
+    border: 1px solid black !important;
+    margin-left: 10px;
+    margin-right: 10px;
+    text-align: center;
+    position: relative;
+}
+
+.add-submit:hover{
+    top: -2px;
+    border: 2px solid black;
+    box-shadow: 0px 0px 10px grey;
+} */
+
+.select-target{
+    position: absolute;
+    width: 25%;
+    height: 40px;
+    line-height: 40px;
+    left : 300px;
+    margin-top: 20px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: row;
+    border: 1px solid black;
+    text-align: center;
+}
+
+.artist-name{
+    padding-right: 10px;
+    text-align: center;
+    width: 30%;
+    background-color: black;
+    color: white;
+}
+
+.artist-name-h4{
+    vertical-align: middle;
+    line-height: 40px;
+}
+
+.artist-name-select{
+    line-height: 40px;
+    padding-left: 10px;
+}
+
+.artist-title{
+    font-size : 14px;
+    font-weight: bold;
+}
+
+#url_add_button, #url_delete_button{
+    cursor: pointer;
+    text-align: center;
+    border: 1px solid black;
+    border-radius: 50px;
+    width: 26px;
+    height: 26px;
+    margin: 0;
+    align-items: flex-end;
+    justify-self: flex-end;
+}
+
+#artist-body-list{
+    font-size: 12px;
+}
+
+.collect_target_delete{
+    font-size: 12px;
+    color: white;
+    background-color: rgb(247, 78, 78) !important;
+    border: 1px solid black;
+    border-radius: 4px;
+    min-width: 40px;
+    border: 1px solid black !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+    padding-right: 2px !important;
+    padding-left: 2px !important;
+}
+
+.dropdown{
+  position : relative;
+  display : inline-block;
+}
+
+.dropbtn_icon{
+  font-family : 'Material Icons';
+}
+.dropbtn{
+  /* border : 1px solid rgb(37, 37, 37); */
+  background-color: transparent;
+  font-weight: 400;
+  color : black;
+  /* padding : 9px; */
+  width : 50px;
+  text-align: left;
+  cursor : pointer;
+  font-size : 12px;
+}
+.dropdown-content{
+  display : none;
+  flex-direction: column;
+  position : absolute;
+  z-index : 1; /*다른 요소들보다 앞에 배치*/
+  font-weight: 400;
+  background-color: #f9f9f9;
+  min-width : 80px;
+  height: 15px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dropdown-content > div{
+  display : block;
+  text-decoration : none;
+  color : rgb(37, 37, 37);
+  font-size : 12px;
+  padding : 12px 20px;
+}
+
+.dropdown-content > div:hover{
+  background-color : #ececec
+}
+
+.dropdown:hover .dropdown-content {
+  display: flex;
+}
+
+.artist_attr_button_layout{
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-end;
+}
+
+#artist_attr_add_button, #artist_attr_delete_button{
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    border: 1px solid rgb(107, 110, 112);
+    border-radius: 50px;
+    width: 26px;
+    height: 26px;
+    margin-left: 3px;
+    align-items: flex-end;
+    justify-self: flex-end;
+}
+
+.expand{
+    position: absolute;
+    right: -10px;
+    top: 320px;
+    z-index: 100;
+    background-color: transparent;
+    border: 0.0625rem solid transparent;
+}
+
+#artist_open, #platform_open, #item_open{
+    padding: 3px;
+    background-color: white;
+    border-radius: 100px;
+    width: 25px;
+    height: 25px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255), 0 1px 2px rgba(17, 24, 39);
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#artist_open:hover, #platform_open:hover, #item_open:hover{
+    background-color: #1F2937 !important;
+    color: white;
+}
+
+.left-bold > tbody > tr > th, .left-bold>tbody>tr>td:nth-child(1){
+    font-weight: bold;
+}
