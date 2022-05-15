@@ -1,58 +1,27 @@
 import os
+from time import time
 from django.contrib import auth
 from django.shortcuts import render
 from account.models import User
-
 from dataprocess.models import CollectData
-from crawler.models import *
 from config.models import PlatformTargetItem, CollectTargetItem, Schedule
 from config.serializers import PlatformTargetItemSerializer, CollectTargetItemSerializer, ScheduleSerializer
 from dataprocess.functions import export_datareport, import_datareport, import_collects, import_authinfo
-from dataprocess.pagination import ViewPaginatorMixin
-from crawler.views import get_task_result,parse_logfile
 from django.views.decorators.csrf import csrf_exempt
-
 from .resources import *
 from .serializers import *
 from .models import *
 from django.http.response import JsonResponse
 from rest_framework.parsers import JSONParser
-from django.views.decorators.http import require_http_methods 
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
-from utils.decorators import login_required
-from utils.api import APIView, validate_serializer
-from utils.shortcuts import get_env
-
+from utils.api import APIView
 from django.shortcuts import render
 from django.http import HttpResponse
-
 import datetime
-from datetime import timedelta
 import openpyxl
 from openpyxl.writer.excel import save_virtual_workbook
-import logging
-
-formatter = logging.Formatter('[%(asctime)s] - [%(levelname)s] - [%(name)s:%(lineno)d]  - %(message)s', '%Y-%m-%d %H:%M:%S')
-serverlogger = logging.getLogger(__name__)
-userlogger = logging.getLogger("HTTP-Method")
-
-production_env = get_env("YG_ENV", "dev") == "production"
-if production_env:
-    LOG_PATH = "/data/log/user"
-else:
-    LOG_PATH = "./data/log/user"
-
-trfh = logging.handlers.TimedRotatingFileHandler(
-    filename = os.path.join(LOG_PATH, f"{datetime.datetime.today().strftime('%Y-%m-%d')}.log"),
-    when = "midnight",
-    interval=1,
-    encoding="utf-8",
-)
-trfh.setFormatter(formatter)
-trfh.setLevel(logging.INFO)
-userlogger.addHandler(trfh)
-userlogger.setLevel(logging.DEBUG)
+from .logger import userlogger
 
 # login check using cookie
 def logincheck(request):
@@ -227,17 +196,6 @@ def artist_add(request):
     request = logincheck(request)
     return render(request, 'dataprocess/artist_add.html',values)
 
-def monitering(request):
-    platforms = Platform.objects.all()
-    values = {
-      'first_depth' : '모니터링 관리',
-      'second_depth': '모니터링',
-      'platforms' : platforms
-    }
-    request = logincheck(request)
-    return render(request, 'dataprocess/monitering.html', values)
-
-
 def login(request):
     values = {
       'first_depth' : '로그인'
@@ -245,40 +203,6 @@ def login(request):
     request = logincheck(request)
     return render(request, 'dataprocess/login.html',values)
 
-
-class ResultQueryView(ViewPaginatorMixin,APIView):
-    def get(self, request):
-        from_date_str = request.GET.get("fromdate", None)
-        to_date_str = request.GET.get("todate", None)
-        page = request.GET.get('page',1)
-        limit = 3
-        
-        from_date_obj = datetime.datetime.strptime(from_date_str, '%Y-%m-%d')
-        to_date_obj = datetime.datetime.strptime(to_date_str, '%Y-%m-%d')
-
-        day_diff = (to_date_obj - from_date_obj).days
-        platforms = ["crowdtangle", "melon", "spotify", "tiktok", "twitter", "twitter2", "vlive", "weverse", "youtube"]
-        error_details = [] # 전체 에러 디테일
-        for day in range(0, day_diff + 1):
-            for platform in platforms:
-                title_date = from_date_obj + timedelta(days=day)
-                title_str = title_date.strftime("%Y-%m-%d")
-                log_dir = f"../data/log/crawler/{platform}/{title_str}" # TODO: 배포환경시 경로
-                #log_dir = f"./data/log/crawler/{platform}/{title_str}" # TODO: 개발환경시 경로
-                if os.path.isdir(log_dir) is True:
-                    file_list = os.listdir(log_dir)
-                    for file_name in file_list:
-                        task_id = file_name.split('.')[0]
-                        task_result = get_task_result(task_id)
-                        if task_result is not None:
-                            errors, error_infos = parse_logfile(f'{log_dir}/{file_name}')
-                            for error_info in error_infos:
-                                artist_id = Artist.objects.get(name = error_info['artist']).id
-                                platform_id = Platform.objects.get(name =  error_info['platform']).id
-                                error_info['id'] = CollectTarget.objects.get(artist_id = artist_id, platform_id = platform_id).id #collect target id
-                                error_details.append(error_info)
-
-        return JsonResponse({"data": self.paginate(error_details, page, limit)})
 
 class PlatformAPI(APIView):
     # @login_required
@@ -716,143 +640,163 @@ class DataReportAPI(APIView):
         start_date = request.GET.get('start_date', None)
         end_date = request.GET.get('end_date', None)
 
-        #artist name
-        artist_objects = Artist.objects.filter(active=1)
-        artist_objects_values = artist_objects.values()
-        artist_list = []
-        for a in artist_objects_values:
-            artist_list.append(a['name'])
+        # artist name
+        # By caching Enhancing Lazy loading Performance 
+        artist_objects = list(Artist.objects.filter(active=1))
+        artist_list = [query.name for query in artist_objects]
 
+        # platform target names
+        # By caching and using Eager laoding Enhancing Lazy Loading Performance
+        # Execution time changing: 0.0442s -> 0.0109s
+        platform_id = Platform.objects.get(name = platform).id # 가져오고자 하는 platform id
+        collect_target_id_list = [collect_target.id for collect_target in list(CollectTarget.objects.filter(platform = platform_id))] # 해당 platfrom에 속한 크롤링 대상 객체들
+        collect_target_item = CollectTargetItem.objects.select_related('collect_target').filter(collect_target_id__in=collect_target_id_list) #크롤링 대상 객체
+        target_column_list = list(set(item.target_name for item in collect_target_item))
         #platform target names
-        platform_id = Platform.objects.get(name = platform).id
-        collecttargets = CollectTarget.objects.filter(platform = platform_id)
-        collecttargets = collecttargets.values()
-        platform_list = set()
-        for collecttarget in collecttargets:
-            platform_objects = CollectTargetItem.objects.filter(collect_target_id = collecttarget['id'])
-            platform_objects_values = platform_objects.values()
-            for p in platform_objects_values:
-                if p['target_name'] in platform_list:
-                    continue
-                platform_list.add(p['target_name'])
-        platform_list = list(platform_list)
+
         #플랫폼 헤더 정보 순서와 db 칼럼 저장 순서 싱크 맞추기
+        # Refactoring ambiguous variable names, and apply caching
+        # Comments Additional description for variable
         platform_header = []
-        objects = CollectData.objects.filter(collect_items__platform=platform)
-        objects_values = objects.values()
-        if len(objects_values) > 0:
-            key_list = list(objects_values[0]['collect_items'].keys())
-            for key in key_list:
-                if key in platform_list:
+        crawlered_data_list = [item.collect_items for item in list(CollectData.objects.filter(collect_items__platform=platform))]
+        # Configuration of collect_data_dict_list
+        # [{'artist':'빅뱅', 'views':215601231 ...}, {'artist':''blabla~', 'views':123123} ...]
+        # 크롤링된 데이터의 여러 칼럼을 보여준다.
+        
+        if len(crawlered_data_list) > 0:
+            for key in crawlered_data_list[0].keys():
+                if key in target_column_list:
                     platform_header.append(key)
                 else:
                     continue
         else:
-            platform_header = platform_list
+            platform_header = target_column_list
+        
 
-        try:
-            if type == '누적':
-                start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-                start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
-                check = False
+        # try:
+        if type == '누적':
+            start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
+            check = False
+
+            # Mainly Improved logic: GET Crawled Data
+            # BY Caching, Improve performance of searching data 3.099s -> 0.065s
+            # 두 번째로 오래 걸리는 critical path로 약 5배의 성능 상승을 도출함
+            for data in crawlered_data_list:
+                crawling_artist_list.append(data["artist"])
+            
+            filter_datas = []
+            filter_objects = [collectData.collect_items for collectData in list(CollectData.objects.filter(collect_items__reserved_date=start_date_string, collect_items__platform=platform))]
+            for artist in artist_list:
+                artist_object = []
+                for filter_object in filter_objects:
+                    # print(filter_object)
+                    if filter_object['artist'] == artist:
+                        artist_object.append(filter_object)
+                if artist_object:
+                    check = True
+                    # 같은 날짜에 여러개 있을 때 가장 앞의 것 가져오기
+                    filter_value = artist_object[0]
+                    filter_datas.append(filter_value)
+            
+            # 해당날짜에 데이터가 하나라도 있을 때
+            if check:
+                return JsonResponse(data={'success': True, 'data': filter_datas, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list': crawling_artist_list})
+            # 해당날짜에 데이터가 하나도 없을 때
+            else:
                 crawling_artist_list = []
                 objects = CollectData.objects.filter(collect_items__platform=platform)
                 objects_value = objects.values()
                 for val in objects_value:
-                    crawling_artist_list.append(val["collect_items"]["artist"])
-                filter_datas = []
-                for artist in artist_list:
-                    filter_objects = CollectData.objects.filter(collect_items__artist=artist, collect_items__platform=platform,
+                    crawling_artist_list.append(val['collect_items']['artist'])
+                return JsonResponse(status=200, data={'success': True, 'data': 'no data', 'artists': artist_list, 'platform': platform_header,
+                                                    'crawling_artist_list': crawling_artist_list})
+
+        elif type == '기간별':
+            # 전날 값을 구함
+            st_time = time()
+            start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d").date() - datetime.timedelta(1)
+            end_date_dateobject = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+            start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
+            end_date_string = end_date_dateobject.strftime("%Y-%m-%d")
+            check = False
+
+            # Mainly Improved logic: GET Crawled Data
+            # BY Caching, Improve performance of searching data 10.102s -> 0.088s
+            # 가장 오래 걸리는 부분으로 약 5배의 성능 상승을 도출함
+
+            crawling_artist_list = []
+            column_list = ['id', 'artist', 'user_created', 'recorded_date', 'platform', 'url', 'url1', 'url2', 'reserved_date', 'updated_dt']
+            filter_objects = [collectData.collect_items for collectData in list(CollectData.objects.filter(collect_items__platform=platform))]
+            
+            for val in filter_objects:
+                crawling_artist_list.append(val['artist'])
+            
+            filter_datas_total = []
+            for artist in artist_list:
+                filter_objects_start = []
+                filter_objects_end = []
+                for object in filter_objects:
+                    if object['artist'] == artist:
+                        if object['reserved_date'] == start_date_string:
+                            filter_objects_start.append(object)
+                        if object['reserved_date'] == end_date_string:
+                            filter_objects_end.append(object)
+                
+                # 둘 다 존재할 때
+                if filter_objects_start and filter_objects_end:
+                    check = True
+                    filter_objects_start_value = filter_objects_start[0]
+
+                    # id랑 artist, date 빼고 보내주기
+                    data_json = {}
+                    filter_objects_end_value = filter_objects_end[0]
+
+                    for field_name in filter_objects_start_value.keys():
+                        if field_name not in column_list:
+                            if filter_objects_end_value[field_name] is not None and filter_objects_start_value[field_name] is not None:
+                                data_json[field_name] = int(filter_objects_end_value[field_name]) - int(filter_objects_start_value[field_name])
+                            elif filter_objects_end_value[field_name] is not None:  # 앞의 날짜를 0으로 처리한 형태
+                                data_json[field_name] = filter_objects_end_value[field_name]
+                            else: # 앞의 날짜가 없다면 0으로 보내기
+                                data_json[field_name] = 0
+                            data_json[field_name+'_end'] = filter_objects_end_value[field_name]
+                        else:  # 숫자 아닌 다른 정보들(user_created 등)
+                            data_json[field_name] = filter_objects_start_value[field_name]
+                    filter_datas_total.append(data_json)
+                elif not filter_objects_start and filter_objects_end:
+                    # 시작날짜의 데이터가 존재하지 않고 끝날짜의 데이터만 존재할 때
+                    # 시작날짜: 0으로 해서 계산 -> 끝날짜 데이터 자체를 보냄
+                    check = True
+                    filter_objects_end_value = filter_objects_end[0]
+                    filter_datas_total.append(filter_objects_end_value)
+            ed_time = time()
+            print(ed_time - st_time)
+            if check: # 양끝 모두 존재 or 끝날짜만 존재
+                return JsonResponse(data={'success': True, 'data': filter_datas_total, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list':crawling_artist_list})
+            else: # 끝날짜의 데이터가 아예 존재하지 않을 때
+                return JsonResponse(status=400, data={'success': False, 'data': end_date})
+        
+        else:#누적도 기간별도 아닌 경우(에러처리)
+            start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
+            crawling_artist_list = []
+            objects = CollectData.objects.filter(collect_items__platform=platform)
+            objects_value = objects.values()
+            for val in objects_value:
+                crawling_artist_list.append(val['collect_items']['artist'])
+            objects = CollectData.objects.filter(collect_items__platform=platform,
                         collect_items__reserved_date = start_date_string)
-                    if filter_objects.exists():
-                        check = True
-                        # 같은 날짜에 여러개 있을 때 가장 앞의 것 가져오기
-                        filter_value = filter_objects.values()[0]
-                        filter_datas.append(filter_value['collect_items'])
-                # 해당날짜에 데이터가 하나라도 있을 때
-                if check:
-                    return JsonResponse(data={'success': True, 'data': filter_datas, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list': crawling_artist_list})
-                # 해당날짜에 데이터가 하나도 없을 때
-                else:
-                    crawling_artist_list = []
-                    objects = CollectData.objects.filter(collect_items__platform=platform)
-                    objects_value = objects.values()
-                    for val in objects_value:
-                        crawling_artist_list.append(val['collect_items']['artist'])
-                    return JsonResponse(status=200, data={'success': True, 'data': 'no data', 'artists': artist_list, 'platform': platform_header,
-                                                        'crawling_artist_list': crawling_artist_list})
-
-            elif type == '기간별':
-                # 전날 값을 구함
-                start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d").date() - datetime.timedelta(1)
-                end_date_dateobject = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
-                start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
-                end_date_string = end_date_dateobject.strftime("%Y-%m-%d")
-                check = False
-                crawling_artist_list = []
-                objects = CollectData.objects.filter(collect_items__platform=platform)
-                objects_value = objects.values()
-                for val in objects_value:
-                    crawling_artist_list.append(val['collect_items']['artist'])
-                filter_datas_total = []
-                for artist in artist_list:
-                    filter_objects_start = CollectData.objects.filter(collect_items__artist=artist, collect_items__platform=platform,
-                            collect_items__reserved_date = start_date_string)
-                    filter_objects_end = CollectData.objects.filter(collect_items__artist=artist, collect_items__platform=platform,
-                            collect_items__reserved_date = end_date_string)
-                    # 둘 다 존재할 때
-                    if filter_objects_start.exists() and filter_objects_end.exists():
-                        check = True
-                        filter_objects_start_value = filter_objects_start.values()[0]
-                        filter_objects_start_value = filter_objects_start_value['collect_items']
-
-                        # id랑 artist, date 빼고 보내주기
-                        data_json = {}
-                        filter_objects_end_value = filter_objects_end.values()[0]
-                        filter_objects_end_value = filter_objects_end_value['collect_items']
-                        for field_name in filter_objects_start_value.keys():
-                            if field_name != 'id' and field_name != 'artist' and field_name != 'user_created' and field_name != 'recorded_date' and field_name != 'platform' and field_name != 'url' and field_name != 'url1' and field_name != 'url2' and field_name != 'reserved_date' and field_name != 'updated_dt':
-                                if filter_objects_end_value[field_name] is not None and filter_objects_start_value[field_name] is not None:
-                                    data_json[field_name] = int(filter_objects_end_value[field_name]) - int(filter_objects_start_value[field_name])
-                                elif filter_objects_end_value[field_name] is not None:  # 앞의 날짜를 0으로 처리한 형태
-                                    data_json[field_name] = filter_objects_end_value[field_name]
-                                else: # 앞의 날짜가 없다면 0으로 보내기
-                                    data_json[field_name] = 0
-                                data_json[field_name+'_end'] = filter_objects_end_value[field_name]
-                            else:  # 숫자 아닌 다른 정보들(user_created 등)
-                                data_json[field_name] = filter_objects_start_value[field_name]
-                        filter_datas_total.append(data_json)
-                    elif not filter_objects_start.exists() and filter_objects_end.exists():
-                        # 시작날짜의 데이터가 존재하지 않고 끝날짜의 데이터만 존재할 때
-                        # 시작날짜: 0으로 해서 계산 -> 끝날짜 데이터 자체를 보냄
-                        check = True
-                        filter_objects_end_value = filter_objects_end.values()[0]
-                        filter_objects_end_value = filter_objects_end_value['collect_items']
-                        filter_datas_total.append(filter_objects_end_value)
-                if check: # 양끝 모두 존재 or 끝날짜만 존재
-                    return JsonResponse(data={'success': True, 'data': filter_datas_total, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list':crawling_artist_list})
-                else: # 끝날짜의 데이터가 아예 존재하지 않을 때
-                    return JsonResponse(status=400, data={'success': False, 'data': end_date})
-            else:#누적도 기간별도 아닌 경우(에러처리)
-                start_date_dateobject = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-                start_date_string = start_date_dateobject.strftime("%Y-%m-%d")
-                crawling_artist_list = []
-                objects = CollectData.objects.filter(collect_items__platform=platform)
-                objects_value = objects.values()
-                for val in objects_value:
-                    crawling_artist_list.append(val['collect_items']['artist'])
-                objects = CollectData.objects.filter(collect_items__platform=platform,
-                            collect_items__reserved_date = start_date_string)
-                if objects.exists():
-                    platform_queryset_values = objects.values()
-                    platform_datas = []
-                    for queryset_value in platform_queryset_values:
-                        platform_datas.append(queryset_value['collect_items'])
-                    return JsonResponse(data={'success': True, 'data': platform_datas, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list':crawling_artist_list})
-                else:
-                    return JsonResponse(status=400, data={'success': False, 'data': start_date})
-        except:
-            return JsonResponse(status=400, data={'success': False, 'data': start_date})
+            if objects.exists():
+                platform_queryset_values = objects.values()
+                platform_datas = []
+                for queryset_value in platform_queryset_values:
+                    platform_datas.append(queryset_value['collect_items'])
+                return JsonResponse(data={'success': True, 'data': platform_datas, 'artists': artist_list, 'platform': platform_header,'crawling_artist_list':crawling_artist_list})
+            else:
+                return JsonResponse(status=400, data={'success': False, 'data': start_date})
+        # except:
+        #     return JsonResponse(status=400, data={'success': False, 'data': start_date})
     
     def post(self, request):
         '''
